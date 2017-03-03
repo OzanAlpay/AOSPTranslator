@@ -1,0 +1,238 @@
+#!/usr/bin/env ruby
+require 'nokogiri'
+require 'axlsx'
+require 'spreadsheet'
+# author : Ozan Alpay
+# email : ozanalpay at yandex dot com dot tr
+# modification dates : [27/02/2017 , 28/02/2017, 01/03/2017, 03/03/2017]
+#
+
+
+# This function find differences between two xml files string elements for ex:
+# If values/strings.xml has 30 string,value keys whereas values-nl/strings.xml has only 15 -> That means you haven't translated 15 strings
+# It will find them , at write their value to xls values according to their id , and value
+def finder_controller(item_type, input_language)
+
+		if item_type == "string"
+=begin
+			begin
+				string_en_doc = Nokogiri::XML(File.open("values/strings.xml")) #Open xml doc from values dir
+		    cm_string_en_doc = Nokogiri::XML(File.open("values/cm_strings.xml"))
+				string_input_doc = Nokogiri::XML(File.open("values-#{input_language}/strings.xml")) #Read input [tr,de,hr etc] and open xml doc from there.
+		    cm_string_input_doc = Nokogiri::XML(File.open("values-#{input_language}/cm_strings.xml"))
+			rescue SystemCallError
+				# Continue....
+			end
+			english_docs = [string_en_doc, cm_string_en_doc].select{ |doc| !doc.nil?}
+			input_language_docs= [string_input_doc, cm_string_input_doc].select{ |doc| !doc.nil?}
+=end
+			english_docs = prepare_single_item_en_docs
+			input_language_docs = prepare_input_language_single_item_docs input_language
+			strings_exists_in_input_language = iterate_over_xml_doc_for_items(item_type, input_language_docs)
+			strings_exists_only_in_english = find_missing_elements_for_selected_item(item_type, strings_exists_in_input_language, english_docs)
+			write_found_item_pairs_to_excel_file(input_language, strings_exists_only_in_english, item_type)
+		elsif item_type == "string-array"
+			begin
+				array_en_doc = Nokogiri::XML(File.open("values/arrays.xml"))
+				string_en_doc = Nokogiri::XML(File.open("values/strings.xml"))
+				array_en_cm_doc = Nokogiri::XML(File.open("values/cm_arrays.xml"))#Open xml doc from values dir
+		    #cm_string_en_doc = Nokogiri::XML(File.open("values/cm_strings.xml"))
+				array_input_doc = Nokogiri::XML(File.open("values-#{input_language}/arrays.xml")) #Read input [tr,de,hr etc] and open xml doc from there.
+				array_input_cm_doc = Nokogiri::XML(File.open("values-#{input_language}/cm-arrays.xml"))
+		    #cm_string_input_doc = Nokogiri::XML(File.open("values-#{input_language}/cm_strings.xml"))
+			rescue SystemCallError
+				# Continue....
+			end
+			eng_docs = [array_en_doc, string_en_doc, array_en_cm_doc].select{ |doc| !doc.nil?}
+			input_language_docs = [array_input_doc, array_input_cm_doc].select{ |doc| !doc.nil?}
+			arrays_exists_in_input_language = iterate_over_xml_doc_for_items(item_type, input_language_docs)
+			arrays_exists_only_in_english = find_missing_elements_for_arrays_items(item_type, arrays_exists_in_input_language, eng_docs)
+			write_found_arrays_to_excel_file(input_language, arrays_exists_only_in_english, item_type)
+		end
+end
+
+
+
+##### START SINGLE ITEMS --> String Integer  <----  ################
+def prepare_single_item_en_docs
+	begin
+		string_en_doc = Nokogiri::XML(File.open("values/strings.xml")) #Open xml doc from values dir
+		cm_string_en_doc = Nokogiri::XML(File.open("values/cm_strings.xml"))
+	rescue
+		#Continue
+	end
+	[string_en_doc, cm_string_en_doc].select{ |doc| !doc.nil?}
+end
+
+def prepare_input_language_single_item_docs(input_language)
+	begin
+		string_input_doc = Nokogiri::XML(File.open("values-#{input_language}/strings.xml")) #Read input [tr,de,hr etc] and open xml doc from there.
+		cm_string_input_doc = Nokogiri::XML(File.open("values-#{input_language}/cm_strings.xml"))
+	rescue
+		#Continue
+	end
+	[string_input_doc, cm_string_input_doc].select{ |doc| !doc.nil?}
+end
+
+def iterate_over_xml_doc_for_items(item_type, docs)
+		found_item_pairs = {}
+		docs.each() do |doc|
+			doc.xpath("//#{item_type}").each do |node|
+					#puts "#{node["name"]} : #{node.text} will be added, node.translatable is -> #{node["translatable"]}"
+				if "false" != node["translatable"].to_s && "tablet" != node["product"] && !node.text.start_with?("@")
+					#puts "#{doc.class.name}"
+					#puts "#{node["name"]} : #{node.text} will be added, node.translatable is -> #{node["translatable"]}"
+					#puts "First Letter of #{node.text} -> #{node.text.chars.first}"
+					found_item_pairs[node["name"]] = node.text
+				end
+			end
+		end
+		found_item_pairs
+end
+
+def find_missing_elements_for_selected_item(item_type, found_items , docs)
+		missing_item_pairs = {}
+		docs.each() do |doc|
+			doc.xpath("//#{item_type}").each do |node|
+				if "false" != node["translatable"].to_s && "tablet" != node["product"] && !found_items.include?(node["name"]) && !missing_item_pairs.include?(node["name"]) && !node.text.start_with?('@')
+					#puts "#{node["name"]} : #{node.text} will be added, node.translatable is ->#{node["translatable"]}"
+					#puts "#{node["name"]} : #{node.text} will be added, node.translatable is -> #{node["translatable"]}"
+					missing_item_pairs[node["name"]] = node.text
+				end
+			end
+		end
+		missing_item_pairs
+end
+
+def write_found_item_pairs_to_excel_file(input_language, different_items, item_type)
+	p = Axlsx::Package.new
+	wb = p.workbook #Create excel sheet
+	wb.add_worksheet(:name => "Basic Worksheet") do |sheet|
+   		sheet.add_row ["Id", "English", "#{input_language.upcase}"]
+   			different_items.each do |key,value| #Write all key,value pairs one by one A column -> String, B column -> Value
+        		#print "Key is = #{key} , value is = #{value}"
+						id = key
+						englishVal = value
+   					sheet.add_row [id, englishVal]
+   		end
+	end
+	p.serialize("EnglishTo#{input_language}translation#{item_type}s.xls") #Have to save as xls , otherwise spreadsheet gem cannot read it correctly
+	puts "EnglishTo#{input_language}translation#{item_type}s.xls created"
+end
+#####  END SINGLE ITEMS --> String Integer etc  <----  ########
+###############################################################
+#####  START MULTIPLE ITEMS --> Arrays  <----  ################
+
+def find_missing_elements_for_arrays_items(item_type, found_items ,docs)
+		missing_item_pairs = {}
+		docs.each() do |doc|
+			doc.xpath("//#{item_type}").each do |node|
+				if "false" != node["translatable"].to_s && "tablet" != node["product"] && !found_items.include?(node["name"]) && !missing_item_pairs.include?(node["name"]) && !node.text.start_with?("@")
+					#puts "#{node["name"]} : #{node.text} will be added, node.translatable is ->#{node["translatable"]}"
+					#puts "#{node["name"]} : #{node.text} will be added, node.translatable is -> #{node["translatable"]}"
+					#puts "Node = #{node} , its class = #{node.class.name}"
+					#puts "Looking for #{node["name"]} array:"
+					itemList = []
+					#puts "Node is = #{node}"
+					node.css("item").each do |child|
+						break if child.text.start_with?("@")
+						#puts "Array Element : #{child.text}"
+						itemList << child.text
+						#missing_item_pairs[node["name"]] = node.text
+					end
+					missing_item_pairs[node["name"]] = itemList unless itemList.empty?
+				end
+			end
+		end
+		missing_item_pairs
+end
+
+def write_found_arrays_to_excel_file(input_language, different_items,item_type)
+	p = Axlsx::Package.new
+	wb = p.workbook #Create excel sheet
+	wb.add_worksheet(:name => "Basic Worksheet") do |sheet|
+   		sheet.add_row ["Id", "English", "#{input_language.upcase}"]
+   			different_items.each do |key,value| #Write all key,value pairs one by one A column -> String, B column -> Value
+        		#print "Key is = #{key} , value is = #{value}"
+						#puts "id is = #{key} values is = #{value}"
+						id = key
+						englishVal = value
+   					sheet.add_row [id, englishVal]
+   		end
+	end
+	p.serialize("EnglishTo#{input_language}translation#{item_type}s.xls") #Have to save as xls , otherwise spreadsheet gem cannot read it correctly
+	puts "EnglishTo#{input_language}translation#{item_type}s.xls created"
+end
+
+
+
+##### END MULTIPLE ITEMS --> Arrays <-- #######################
+
+def transfer_translations(input_language)
+	puts  "putValuesIntoCorrectPlaces Function Started with input_language = #{input_language}"
+	Spreadsheet.client_encoding = 'UTF-8'
+	begin
+		book = Spreadsheet.open("EnglishTo#{input_language}translation.xls")
+		#xml_file = Nokogiri::XML(File.open("values-#{input_language}/strings.xml")
+		xml_file = File.read("values-#{input_language}/strings.xml")
+		doc = Nokogiri::XML(xml_file)
+	rescue SystemCallError
+		raise "File is not found"
+	end
+
+	#toBeInsertedStrings = {};
+	sheet1 = book.worksheet 0
+	sheet1.each 1 do |row|
+		if row[2] != nil
+			string_node = Nokogiri::XML::Node.new "string", doc
+			puts string_node
+			string_node.content = row[2]
+			string_node["id"] = row[0]
+			#puts "Ozan string_node = #{string_node.to_s}"
+			doc.root.add_child string_node
+		end
+	end
+	File.write(filename, doc.to_xml)
+
+
+	#Write function here
+end
+
+
+def find_not_translated_strings(input_language, item_type)
+	puts "Looking for differences between EN - #{input_language.upcase}"
+	begin
+		string_en_doc = Nokogiri::XML(File.open("values/strings.xml")) #Open xml doc from values dir
+    cm_string_en_doc = Nokogiri::XML(File.open("values/cm_strings.xml"))
+		string_input_doc = Nokogiri::XML(File.open("values-#{input_language}/strings.xml")) #Read input [tr,de,hr etc] and open xml doc from there.
+    cm_string_input_doc = Nokogiri::XML(File.open("values-#{input_language}/cm_strings.xml"))
+	rescue SystemCallError
+		#puts "File Not Found , Please Check Directory"
+		#raise "File Not Found , Please Check Directory"
+	end
+	#english_docs = [string_en_doc, cm_string_en_doc].select{ |doc| !doc.nil?}
+	#input_language_docs= [string_input_doc, cm_string_input_doc].select{ |doc| !doc.nil?}
+	#english_docs = english_docs.select{|doc| !doc.nil?}
+	#input_language_docs = input_language_docs.select{|doc| !doc.nil?}
+	#puts "English Docs Size = #{english_docs.size}"
+	#puts "Input Language Docs Size = #{input_language_docs.size}"
+	finder_controller(item_type, input_language)
+
+	#strings_exists_in_input_language = iterate_over_xml_doc_for_item(item_type, input_language_docs)
+	#strings_exists_only_in_english = find_missing_elements_for_selected_item(item_type, strings_exists_in_input_language, english_docs)
+	#write_found_pairs_to_excel_file(input_language, strings_exists_only_in_english, item_type)
+end
+
+#MAIN
+
+if(ARGV.first == "diff")
+	find_not_translated_strings(ARGV[1], ARGV[2])
+elsif(ARGV.first == "transfer")
+	transfer_translations(ARGV[1])
+elsif(ARGV.first == "all")
+	find_not_translated_strings(ARGV[1],"string")
+	find_not_translated_strings(ARGV[1],"string-array")
+elsif(ARGV.first == "help")
+	puts "diff -> to find differences between two files , take two params language and element  ex ./StringParser.rb diff tr string"
+	puts "transfer to import translations from excel file ex ./StringParser.rb transfer tr"
+end
