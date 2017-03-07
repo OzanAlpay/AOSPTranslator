@@ -12,7 +12,6 @@ require 'spreadsheet'
 # If values/strings.xml has 30 string,value keys whereas values-nl/strings.xml has only 15 -> That means you haven't translated 15 strings
 # It will find them , at write their value to xls values according to their id , and value
 def finder_controller(item_type, input_language)
-
 		if item_type == "string"
 =begin
 			begin
@@ -27,24 +26,28 @@ def finder_controller(item_type, input_language)
 			input_language_docs= [string_input_doc, cm_string_input_doc].select{ |doc| !doc.nil?}
 =end
 			english_docs = prepare_single_item_en_docs
-			input_language_docs = prepare_input_language_single_item_docs input_language
+			input_language_docs = prepare_single_item_input_language_docs(input_language)
 			strings_exists_in_input_language = iterate_over_xml_doc_for_items(item_type, input_language_docs)
 			strings_exists_only_in_english = find_missing_elements_for_selected_item(item_type, strings_exists_in_input_language, english_docs)
 			write_found_item_pairs_to_excel_file(input_language, strings_exists_only_in_english, item_type)
 		elsif item_type == "string-array"
+=begin
 			begin
 				array_en_doc = Nokogiri::XML(File.open("values/arrays.xml"))
 				string_en_doc = Nokogiri::XML(File.open("values/strings.xml"))
 				array_en_cm_doc = Nokogiri::XML(File.open("values/cm_arrays.xml"))#Open xml doc from values dir
-		    #cm_string_en_doc = Nokogiri::XML(File.open("values/cm_strings.xml"))
+		    cm_string_en_doc = Nokogiri::XML(File.open("values/cm_strings.xml"))
 				array_input_doc = Nokogiri::XML(File.open("values-#{input_language}/arrays.xml")) #Read input [tr,de,hr etc] and open xml doc from there.
 				array_input_cm_doc = Nokogiri::XML(File.open("values-#{input_language}/cm-arrays.xml"))
-		    #cm_string_input_doc = Nokogiri::XML(File.open("values-#{input_language}/cm_strings.xml"))
+		    cm_string_input_doc = Nokogiri::XML(File.open("values-#{input_language}/cm_strings.xml"))
 			rescue SystemCallError
 				# Continue....
 			end
-			eng_docs = [array_en_doc, string_en_doc, array_en_cm_doc].select{ |doc| !doc.nil?}
-			input_language_docs = [array_input_doc, array_input_cm_doc].select{ |doc| !doc.nil?}
+=end
+			eng_docs = prepare_multiple_item_en_docs
+			#eng_docs = [array_en_doc, string_en_doc, array_en_cm_doc].select{ |doc| !doc.nil?}
+			#input_language_docs = [array_input_doc, array_input_cm_doc].select{ |doc| !doc.nil?}
+			input_language_docs = prepare_multiple_item_input_language_docs(input_language)
 			arrays_exists_in_input_language = iterate_over_xml_doc_for_items(item_type, input_language_docs)
 			arrays_exists_only_in_english = find_missing_elements_for_arrays_items(item_type, arrays_exists_in_input_language, eng_docs)
 			write_found_arrays_to_excel_file(input_language, arrays_exists_only_in_english, item_type)
@@ -64,7 +67,7 @@ def prepare_single_item_en_docs
 	[string_en_doc, cm_string_en_doc].select{ |doc| !doc.nil?}
 end
 
-def prepare_input_language_single_item_docs(input_language)
+def prepare_single_item_input_language_docs(input_language)
 	begin
 		string_input_doc = Nokogiri::XML(File.open("values-#{input_language}/strings.xml")) #Read input [tr,de,hr etc] and open xml doc from there.
 		cm_string_input_doc = Nokogiri::XML(File.open("values-#{input_language}/cm_strings.xml"))
@@ -122,6 +125,44 @@ end
 #####  END SINGLE ITEMS --> String Integer etc  <----  ########
 ###############################################################
 #####  START MULTIPLE ITEMS --> Arrays  <----  ################
+
+def prepare_multiple_item_en_docs
+	file_names = ["strings.xml", "arrays.xml", "cm_strings.xml", "cm_arrays.xml"]
+	file_names = file_names.map { |file_name| file_name = 'values/' + file_name }
+	files = []
+	#puts "File names are = #{file_names.to_s}"
+	file_names.each do |file_name|
+		begin
+		 temp_file = Nokogiri::XML(File.open(file_name))
+		 puts "File #{file_name} added"
+		 files << temp_file
+		rescue
+			puts "File #{file_name} couldn't found"
+		end
+		#puts "File #{file_name} added"
+	end
+	files.select{ |doc| !doc.nil?}
+end
+
+def prepare_multiple_item_input_language_docs(input_language)
+	file_names = ["strings.xml", "arrays.xml", "cm_strings.xml", "cm_arrays.xml"]
+	file_names = file_names.map { |file_name| file_name = "values-#{input_language}" + '/' + file_name }
+	files = []
+	#puts "File names are = #{file_names.to_s}"
+	file_names.each do |file_name|
+		begin
+		 temp_file = Nokogiri::XML(File.open(file_name))
+		 puts "File #{file_name} added"
+		 files << temp_file
+		rescue
+			puts "File #{file_name} couldn't found"
+		end
+		#puts "File #{file_name} added"
+	end
+	files.select{ |doc| !doc.nil?}
+end
+
+
 
 def find_missing_elements_for_arrays_items(item_type, found_items ,docs)
 		missing_item_pairs = {}
