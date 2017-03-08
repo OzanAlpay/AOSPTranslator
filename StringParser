@@ -222,32 +222,39 @@ end
 def transfer_array_translations(input_language, item_type)
 	puts "Transfer Array Translations started with input_language = #{input_language} and item_type = #{item_type}"
 	Spreadsheet.client_encoding = 'UTF-8'
-	#begin
-		puts "EnglishTo#{input_language}translation#{item_type}s.xls"
+	begin
+		#puts "EnglishTo#{input_language}translation#{item_type}s.xls"
 		book = Spreadsheet.open("EnglishTo#{input_language}translation#{item_type}s.xls")
-		puts "book created"
+		file_name = "values-#{input_language}/arrays.xml"
+		#puts "book created"
 		xml_file = File.read("values-#{input_language}/arrays.xml")
-		puts "xml_file ok"
+		#puts "xml_file ok"
 		doc = Nokogiri::XML(xml_file)
-	#rescue
-		#raise "File Not Found, Create file or give permissions"
-	#end
+	rescue
+		raise "File Not Found, Create file or give permissions"
+	end
 	sheet = book.worksheet 0
 	sheet.each 1 do |row|
 		unless row[2].nil?
 			string_array = Nokogiri::XML::Node.new "string-array", doc
-			puts string_array
-			puts "Row0 is #{row[0]}"
-			puts "After Row0"
-			string_array.content = row[2]
-			puts string_array.content
-			string_array.node["name"] = row[0]
-			string_array_name = row[0]
-			string_array = row[2] ##TODO fix it to 2 before use in production
+			#string_array.content = row[2]
+			string_array["name"] = row[0]
+			#child = Nokogiri::XML::Node.new "item" ,doc
+			child_items = row[2].split(",")
+			child_items.each do |child_item|
+				#print "Child is = #{child_item}"
+				child = Nokogiri::XML::Node.new "item" ,doc
+				child.content = child_item
+				string_array.add_child(child)
+			end
+			#puts "Ozan = #{string_array}"
+			#string_array = row[2] ##TODO fix it to 2 before use in production
 			#string_array = normalize_array(string_array)
-			print "string-array name = #{string_array_name}, array values = #{string_array}"
+			#print "string-array name = #{string_array_name}, array values = #{string_array}"
+			doc.root.add_child string_array
 		end
 	end
+	File.write(file_name, doc.to_xml)
 end
 
 #def normalize_array(string_array)
