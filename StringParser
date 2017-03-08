@@ -3,9 +3,9 @@ require 'nokogiri'
 require 'axlsx'
 require 'spreadsheet'
 # author : Ozan Alpay
-# email : ozanalpay at yandex dot com dot tr
-# modification dates : [27/02/2017 , 28/02/2017, 01/03/2017, 03/03/2017]
-#
+# email : ozanalpay at yandex dot com dot tr or ozan dot alpay at vestel dot com dot tr
+# modification dates : [27/02/2017 , 28/02/2017, 01/03/2017, 03/03/2017] After that started to use Git VCS
+# company : Vestel Electronics
 
 
 # This function find differences between two xml files string elements for ex:
@@ -13,40 +13,13 @@ require 'spreadsheet'
 # It will find them , at write their value to xls values according to their id , and value
 def finder_controller(item_type, input_language)
 		if item_type == "string"
-=begin
-			begin
-				string_en_doc = Nokogiri::XML(File.open("values/strings.xml")) #Open xml doc from values dir
-		    cm_string_en_doc = Nokogiri::XML(File.open("values/cm_strings.xml"))
-				string_input_doc = Nokogiri::XML(File.open("values-#{input_language}/strings.xml")) #Read input [tr,de,hr etc] and open xml doc from there.
-		    cm_string_input_doc = Nokogiri::XML(File.open("values-#{input_language}/cm_strings.xml"))
-			rescue SystemCallError
-				# Continue....
-			end
-			english_docs = [string_en_doc, cm_string_en_doc].select{ |doc| !doc.nil?}
-			input_language_docs= [string_input_doc, cm_string_input_doc].select{ |doc| !doc.nil?}
-=end
 			english_docs = prepare_single_item_en_docs
 			input_language_docs = prepare_single_item_input_language_docs(input_language)
 			strings_exists_in_input_language = iterate_over_xml_doc_for_items(item_type, input_language_docs)
 			strings_exists_only_in_english = find_missing_elements_for_selected_item(item_type, strings_exists_in_input_language, english_docs)
 			write_found_item_pairs_to_excel_file(input_language, strings_exists_only_in_english, item_type)
 		elsif item_type == "string-array"
-=begin
-			begin
-				array_en_doc = Nokogiri::XML(File.open("values/arrays.xml"))
-				string_en_doc = Nokogiri::XML(File.open("values/strings.xml"))
-				array_en_cm_doc = Nokogiri::XML(File.open("values/cm_arrays.xml"))#Open xml doc from values dir
-		    cm_string_en_doc = Nokogiri::XML(File.open("values/cm_strings.xml"))
-				array_input_doc = Nokogiri::XML(File.open("values-#{input_language}/arrays.xml")) #Read input [tr,de,hr etc] and open xml doc from there.
-				array_input_cm_doc = Nokogiri::XML(File.open("values-#{input_language}/cm-arrays.xml"))
-		    cm_string_input_doc = Nokogiri::XML(File.open("values-#{input_language}/cm_strings.xml"))
-			rescue SystemCallError
-				# Continue....
-			end
-=end
 			eng_docs = prepare_multiple_item_en_docs
-			#eng_docs = [array_en_doc, string_en_doc, array_en_cm_doc].select{ |doc| !doc.nil?}
-			#input_language_docs = [array_input_doc, array_input_cm_doc].select{ |doc| !doc.nil?}
 			input_language_docs = prepare_multiple_item_input_language_docs(input_language)
 			arrays_exists_in_input_language = iterate_over_xml_doc_for_items(item_type, input_language_docs)
 			arrays_exists_only_in_english = find_missing_elements_for_arrays_items(item_type, arrays_exists_in_input_language, eng_docs)
@@ -243,34 +216,13 @@ def transfer_translations(input_language)
 		end
 	end
 	File.write(filename, doc.to_xml)
-
-
 	#Write function here
 end
 
 
 def find_not_translated_strings(input_language, item_type)
 	puts "Looking for differences between EN - #{input_language.upcase}"
-	begin
-		string_en_doc = Nokogiri::XML(File.open("values/strings.xml")) #Open xml doc from values dir
-    cm_string_en_doc = Nokogiri::XML(File.open("values/cm_strings.xml"))
-		string_input_doc = Nokogiri::XML(File.open("values-#{input_language}/strings.xml")) #Read input [tr,de,hr etc] and open xml doc from there.
-    cm_string_input_doc = Nokogiri::XML(File.open("values-#{input_language}/cm_strings.xml"))
-	rescue SystemCallError
-		#puts "File Not Found , Please Check Directory"
-		#raise "File Not Found , Please Check Directory"
-	end
-	#english_docs = [string_en_doc, cm_string_en_doc].select{ |doc| !doc.nil?}
-	#input_language_docs= [string_input_doc, cm_string_input_doc].select{ |doc| !doc.nil?}
-	#english_docs = english_docs.select{|doc| !doc.nil?}
-	#input_language_docs = input_language_docs.select{|doc| !doc.nil?}
-	#puts "English Docs Size = #{english_docs.size}"
-	#puts "Input Language Docs Size = #{input_language_docs.size}"
 	finder_controller(item_type, input_language)
-
-	#strings_exists_in_input_language = iterate_over_xml_doc_for_item(item_type, input_language_docs)
-	#strings_exists_only_in_english = find_missing_elements_for_selected_item(item_type, strings_exists_in_input_language, english_docs)
-	#write_found_pairs_to_excel_file(input_language, strings_exists_only_in_english, item_type)
 end
 
 #MAIN
