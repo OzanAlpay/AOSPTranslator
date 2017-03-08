@@ -191,16 +191,17 @@ end
 
 ##### END MULTIPLE ITEMS --> Arrays <-- #######################
 
-def transfer_translations(input_language)
-	puts  "putValuesIntoCorrectPlaces Function Started with input_language = #{input_language}"
+def transfer_string_translations(input_language)
+	puts  "transfer_string_translations started with = #{input_language}"
 	Spreadsheet.client_encoding = 'UTF-8'
 	begin
-		book = Spreadsheet.open("EnglishTo#{input_language}translation.xls")
+		book = Spreadsheet.open("EnglishTo#{input_language}translationstrings.xls")
+		file_name = "values-#{input_language}/strings.xml"
 		#xml_file = Nokogiri::XML(File.open("values-#{input_language}/strings.xml")
 		xml_file = File.read("values-#{input_language}/strings.xml")
 		doc = Nokogiri::XML(xml_file)
 	rescue SystemCallError
-		raise "File is not found"
+		raise
 	end
 
 	#toBeInsertedStrings = {};
@@ -210,13 +211,60 @@ def transfer_translations(input_language)
 			string_node = Nokogiri::XML::Node.new "string", doc
 			puts string_node
 			string_node.content = row[2]
-			string_node["id"] = row[0]
+			string_node["name"] = row[0]
 			#puts "Ozan string_node = #{string_node.to_s}"
 			doc.root.add_child string_node
 		end
 	end
-	File.write(filename, doc.to_xml)
-	#Write function here
+	File.write(file_name, doc.to_xml)
+end
+
+def transfer_array_translations(input_language, item_type)
+	puts "Transfer Array Translations started with input_language = #{input_language} and item_type = #{item_type}"
+	Spreadsheet.client_encoding = 'UTF-8'
+	#begin
+		puts "EnglishTo#{input_language}translation#{item_type}s.xls"
+		book = Spreadsheet.open("EnglishTo#{input_language}translation#{item_type}s.xls")
+		puts "book created"
+		xml_file = File.read("values-#{input_language}/arrays.xml")
+		puts "xml_file ok"
+		doc = Nokogiri::XML(xml_file)
+	#rescue
+		#raise "File Not Found, Create file or give permissions"
+	#end
+	sheet = book.worksheet 0
+	sheet.each 1 do |row|
+		unless row[2].nil?
+			string_array = Nokogiri::XML::Node.new "string-array", doc
+			puts string_array
+			puts "Row0 is #{row[0]}"
+			puts "After Row0"
+			string_array.content = row[2]
+			puts string_array.content
+			string_array.node["name"] = row[0]
+			string_array_name = row[0]
+			string_array = row[2] ##TODO fix it to 2 before use in production
+			#string_array = normalize_array(string_array)
+			print "string-array name = #{string_array_name}, array values = #{string_array}"
+		end
+	end
+end
+
+#def normalize_array(string_array)
+	#string_array[1,-1]
+#end
+
+def transfer_translations_controller(input_language, item_type)
+	puts "putValuesIntoCorrectPlaces Started with input_language = #{input_language} and item_type = #{item_type}"
+	if item_type == "string"
+		transfer_string_translations(input_language)
+	elsif item_type == "string-array"
+		transfer_array_translations(input_language, item_type)
+	else
+		puts "Unsupported item_type = #{item_type}"
+	end
+	#transfer_translations(input_language) if item_type == "string"
+	#transfer_array_translations(input_language, item_type) if item_type != "string-array"
 end
 
 
@@ -230,11 +278,11 @@ end
 if(ARGV.first == "diff")
 	find_not_translated_strings(ARGV[1], ARGV[2])
 elsif(ARGV.first == "transfer")
-	transfer_translations(ARGV[1])
+	transfer_translations_controller(ARGV[1], ARGV[2])
 elsif(ARGV.first == "all")
-	find_not_translated_strings(ARGV[1],"string")
-	find_not_translated_strings(ARGV[1],"string-array")
+	#find_not_translated_strings(ARGV[1],"string")
+	#find_not_translated_strings(ARGV[1],"string-array")
 elsif(ARGV.first == "help")
-	puts "diff -> to find differences between two files , take two params language and element  ex ./StringParser.rb diff tr string"
-	puts "transfer to import translations from excel file ex ./StringParser.rb transfer tr"
+	puts "diff -> to find differences between two files , take two params language and element  ex StringParser.rb diff tr string"
+	puts "transfer to import translations from excel file ex StringParser.rb transfer tr string"
 end
