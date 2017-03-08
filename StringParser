@@ -58,23 +58,32 @@ end
 
 ##### START SINGLE ITEMS --> String Integer  <----  ################
 def prepare_single_item_en_docs
-	begin
-		string_en_doc = Nokogiri::XML(File.open("values/strings.xml")) #Open xml doc from values dir
-		cm_string_en_doc = Nokogiri::XML(File.open("values/cm_strings.xml"))
-	rescue
-		#Continue
+	file_names = ["values/strings.xml", "values/cm_strings.xml", "values/qtistrings.xml"]
+	files = []
+	file_names.each() do | file_name |
+		begin
+			files << Nokogiri::XML(File.open(file_name))
+			puts "File #{file_name} added"
+		rescue
+			puts "Couldn't find = #{file_name}"
+		end
 	end
-	[string_en_doc, cm_string_en_doc].select{ |doc| !doc.nil?}
+	files.select{ |doc| !doc.nil?}
 end
 
 def prepare_single_item_input_language_docs(input_language)
-	begin
-		string_input_doc = Nokogiri::XML(File.open("values-#{input_language}/strings.xml")) #Read input [tr,de,hr etc] and open xml doc from there.
-		cm_string_input_doc = Nokogiri::XML(File.open("values-#{input_language}/cm_strings.xml"))
-	rescue
-		#Continue
+	file_names = ["strings.xml", "cm_strings.xml", "qtistrings.xml"]
+	file_names = file_names.map {|file_name| file_name = "values-#{input_language}" + '/' + file_name}
+	files = []
+	file_names.each() do | file_name |
+		begin
+			files << Nokogiri::XML(File.open(file_name))
+			puts "File #{file_name} added"
+		rescue
+			puts "Couldn't find = #{file_name}"
+		end
 	end
-	[string_input_doc, cm_string_input_doc].select{ |doc| !doc.nil?}
+	files.select{ |doc| !doc.nil?}
 end
 
 def iterate_over_xml_doc_for_items(item_type, docs)
