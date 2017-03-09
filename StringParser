@@ -4,13 +4,154 @@ require 'axlsx'
 require 'spreadsheet'
 # author : Ozan Alpay
 # email : ozanalpay at yandex dot com dot tr or ozan dot alpay at vestel dot com dot tr
-# modification dates : [27/02/2017 , 28/02/2017, 01/03/2017, 03/03/2017] After that started to use Git VCS
+# modification dates : [27/02/2017 , 28/02/2017, 01/03/2017, 03/03/2017] After that have started to use Git VCS
 # company : Vestel Electronics
 
 
 # This function find differences between two xml files string elements for ex:
 # If values/strings.xml has 30 string,value keys whereas values-nl/strings.xml has only 15 -> That means you haven't translated 15 strings
 # It will find them , at write their value to xls values according to their id , and value
+# TODO Do Major refactoring here,
+class Translator ## Like an abstract class
+	attr_reader :input_language
+
+	def initialize(input_language)
+		@input_language = input_language
+	end
+
+	def prepare_english_docs(docs_list) ##Return available English Files Array
+		file_names = docs_list.map(|doc| doc = 'values/' + doc)
+		available_files = []
+		file_names.each() do |file_name|
+			begin
+				current_file = Nokogiri::XML(File.open(file_name))
+				available_files << current_file unless file_name.nil?
+				puts "File = #{file_name} is added to available files for English lang"
+			rescue
+				puts "Cannot find #{file_name} for English language"
+			end
+		end
+		available_files
+	end
+
+	def prepare_to_be_translated_lang_docs(docs_list) ##Iterate over all available files in selected language , find suitable items for selected type and save them into hash
+		file_names = docs_list.map(|doc| doc = "values-#{@input_language}" + '/' + doc)
+		available_files = []
+		file_names.each() do |file_name|
+			begin
+				current_file = Nokogiri::XML(File.open(file_name))
+				available_files << current_file unless file_name.nil?
+				puts "File = #{file_name} is added to available files for #{@input_language} lang"
+			rescue
+				puts "Cannot find #{file_name} for #{@input_language}"
+			end
+		end
+		available_files
+	end
+
+	def find_items_exist_in_to_be_translated_lang(input_lang_files, item_type)
+		found_item_pairs = {}
+		input_lang_files.each() do |input_lang_file|
+			input_lang_file.xpath("//#{item_type}").each do |node|
+				if is_item_suitable_to_add_founded_list(node)
+					found_item_pairs[node["name"]] = node.text
+				end
+			end
+		end
+		found_item_pairs
+	end
+
+	def is_item_suitable_to_add_founded_list(node)
+		return ("false" != node["translatable"].to_s &&
+					 "tablet" != node["product"] &&
+					 !node.text.start_with?("@"))
+	end
+
+	def find_missing_items(eng_docs, founded_items ,item_type)
+		missing_item_pairs = {}
+		docs.each() do |doc|
+			doc.xpath("//#{item_type}").each do |node|
+				if is_item_suitable_to_add_missing_list(node, founded_items, missing_item_pairs)
+					#puts "#{node["name"]} : #{node.text} will be added, node.translatable is ->#{node["translatable"]}"
+					#puts "#{node["name"]} : #{node.text} will be added, node.translatable is -> #{node["translatable"]}"
+					missing_item_pairs[node["name"]] = node.text
+				end
+			end
+		end
+		missing_item_pairs
+	end
+
+	def is_item_suitable_to_add_missing_list(node, found_items, missing_item_pairs)
+		 return ("false" != node["translatable"].to_s &&
+							"tablet" != node["product"] &&
+							!found_items.include?(node["name"]) &&
+							!missing_item_pairs.include?(node["name"]) &&
+							!node.text.start_with?('@'))
+	end
+
+	def write_found_items_to_excel_file
+		raise NotImplementedError
+	end
+
+	def translate
+		raise NotImplementedError
+	end
+end
+
+class StringTranslator < Translator
+	attr_reader :item_type, :docs
+	def initialize(input_language)
+		super(input_language)
+		@item_type = "string"
+		@docs = ["strings.xml", "cm_strings.xml", "qtistrings.xml"]
+	end
+
+	def prepare_english_docs ##Return available English Files Array
+		super(@docs)
+	end
+
+	def prepare_to_be_translated_lang_docs ##Return array of available files , written in selected language
+		super(@docs)
+	end
+
+	def find_items_exist_in_to_be_translated_lang##Iterate over all available files in selected language , find suitable items for selected type and save them into hash
+		super(prepare_to_be_translated_lang_docs, @item_type)
+	end
+
+	def find_missing_items
+		super(prepare_english_docs, find_items_exist_in_to_be_translated_lang ,@item_type)
+	end
+
+	def write_found_items_to_excel_file
+		different_items = find_missing_items
+		p = Axlsx::Package.new
+		wb = p.workbook #Create excel sheet
+		wb.add_worksheet(:name => "Basic Worksheet") do |sheet|
+	   		sheet.add_row ["Id", "English", "#{@input_language.upcase}"]
+	   			different_items.each do |key,value| #Write all key,value pairs one by one A column -> String, B column -> Value
+	        		#print "Key is = #{key} , value is = #{value}"
+							id = key
+							englishVal = value
+	   					sheet.add_row [id, englishVal]
+	   		end
+		end
+		p.serialize("EnglishTo#{@input_language}translation#{@item_type}s.xls") #Have to save as xls , otherwise spreadsheet gem cannot read it correctly
+		puts "EnglishTo#{@input_language}translation#{@item_type}s.xls created"
+	end
+
+end
+
+
+
+class TranslatorFactory
+	def get_translator(input_language, item_type)
+		case item_type
+		when "string" then StringTranslator(input_language)
+		when "string-array" then StringArrayTranslator(input_language)
+		end
+	end
+end
+
 def finder_controller(item_type, input_language)
 		if item_type == "string"
 			english_docs = prepare_single_item_en_docs
@@ -26,8 +167,6 @@ def finder_controller(item_type, input_language)
 			write_found_arrays_to_excel_file(input_language, arrays_exists_only_in_english, item_type)
 		end
 end
-
-
 
 ##### START SINGLE ITEMS --> String Integer  <----  ################
 def prepare_single_item_en_docs
@@ -74,7 +213,7 @@ def iterate_over_xml_doc_for_items(item_type, docs)
 		end
 		found_item_pairs
 end
-
+##TODO make this part more generic.
 def find_missing_elements_for_selected_item(item_type, found_items , docs)
 		missing_item_pairs = {}
 		docs.each() do |doc|
@@ -145,7 +284,7 @@ def prepare_multiple_item_input_language_docs(input_language)
 end
 
 
-
+#TODO Encapsulate control part
 def find_missing_elements_for_arrays_items(item_type, found_items ,docs)
 		missing_item_pairs = {}
 		docs.each() do |doc|
@@ -190,7 +329,7 @@ end
 
 
 ##### END MULTIPLE ITEMS --> Arrays <-- #######################
-
+##### START TRANSLATION IMPORTERS  ############################
 def transfer_string_translations(input_language)
 	puts  "transfer_string_translations started with = #{input_language}"
 	Spreadsheet.client_encoding = 'UTF-8'
@@ -280,8 +419,9 @@ def find_not_translated_strings(input_language, item_type)
 	finder_controller(item_type, input_language)
 end
 
-#MAIN
-
+###### END TRANSLATION IMPORTERS #########
+###### MAIN ##########
+#TODO Do refactoring here
 if(ARGV.first == "diff")
 	find_not_translated_strings(ARGV[1], ARGV[2])
 elsif(ARGV.first == "transfer")
