@@ -20,7 +20,7 @@ class Translator ## Like an abstract class
 	end
 
 	def prepare_english_docs(docs_list) ##Return available English Files Array
-		file_names = docs_list.map(|doc| doc = 'values/' + doc)
+		file_names = docs_list.map{|doc| doc = 'values/' + doc}
 		available_files = []
 		file_names.each() do |file_name|
 			begin
@@ -35,7 +35,7 @@ class Translator ## Like an abstract class
 	end
 
 	def prepare_to_be_translated_lang_docs(docs_list) ##Iterate over all available files in selected language , find suitable items for selected type and save them into hash
-		file_names = docs_list.map(|doc| doc = "values-#{@input_language}" + '/' + doc)
+		file_names = docs_list.map{|doc| doc = "values-#{@input_language}" + '/' + doc}
 		available_files = []
 		file_names.each() do |file_name|
 			begin
@@ -53,25 +53,25 @@ class Translator ## Like an abstract class
 		found_item_pairs = {}
 		input_lang_files.each() do |input_lang_file|
 			input_lang_file.xpath("//#{item_type}").each do |node|
-				if is_item_suitable_to_add_founded_list(node)
+				if TranslatorUtils.is_item_suitable_to_add_founded_list(node)
 					found_item_pairs[node["name"]] = node.text
 				end
 			end
 		end
 		found_item_pairs
 	end
-
+=begin
 	def is_item_suitable_to_add_founded_list(node)
 		return ("false" != node["translatable"].to_s &&
 					 "tablet" != node["product"] &&
 					 !node.text.start_with?("@"))
 	end
-
+=end
 	def find_missing_items(eng_docs, founded_items ,item_type)
 		missing_item_pairs = {}
-		docs.each() do |doc|
+		eng_docs.each() do |doc|
 			doc.xpath("//#{item_type}").each do |node|
-				if is_item_suitable_to_add_missing_list(node, founded_items, missing_item_pairs)
+				if TranslatorUtils.is_item_suitable_to_add_missing_list(node, founded_items, missing_item_pairs)
 					#puts "#{node["name"]} : #{node.text} will be added, node.translatable is ->#{node["translatable"]}"
 					#puts "#{node["name"]} : #{node.text} will be added, node.translatable is -> #{node["translatable"]}"
 					missing_item_pairs[node["name"]] = node.text
@@ -80,7 +80,7 @@ class Translator ## Like an abstract class
 		end
 		missing_item_pairs
 	end
-
+=begin
 	def is_item_suitable_to_add_missing_list(node, found_items, missing_item_pairs)
 		 return ("false" != node["translatable"].to_s &&
 							"tablet" != node["product"] &&
@@ -88,13 +88,21 @@ class Translator ## Like an abstract class
 							!missing_item_pairs.include?(node["name"]) &&
 							!node.text.start_with?('@'))
 	end
-
+=end
 	def write_found_items_to_excel_file
 		raise NotImplementedError
 	end
 
 	def translate
+		write_found_items_to_excel_file
+	end
+
+	def import_translations_from_excel_file
 		raise NotImplementedError
+	end
+
+	def transfer
+		import_translations_from_excel_file
 	end
 end
 
@@ -139,19 +147,144 @@ class StringTranslator < Translator
 		puts "EnglishTo#{@input_language}translation#{@item_type}s.xls created"
 	end
 
+	def import_found_items_from_excel_file
+		puts  "transfer_string_translations started with = #{@input_language}"
+		Spreadsheet.client_encoding = 'UTF-8'
+		begin
+			book = Spreadsheet.open("EnglishTo#{@input_language}translationstrings.xls")
+			file_name = "values-#{@input_language}/strings.xml"
+			#xml_file = Nokogiri::XML(File.open("values-#{input_language}/strings.xml")
+			xml_file = File.read("values-#{@input_language}/strings.xml")
+			doc = Nokogiri::XML(xml_file)
+		rescue SystemCallError
+			raise
+		end
+
+		#toBeInsertedStrings = {};
+		sheet1 = book.worksheet 0
+		sheet1.each 1 do |row|
+			if row[2] != nil
+				string_node = Nokogiri::XML::Node.new "#{@item_type}", doc
+				puts string_node
+				string_node.content = row[2]
+				string_node["name"] = row[0]
+				#puts "Ozan string_node = #{string_node.to_s}"
+				doc.root.add_child string_node
+			end
+		end
+		File.write(file_name, doc.to_xml)
+	end
+
+end
+
+class StringArrayTranslator < Translator
+	attr_reader :item_type, :docs_names, :docs
+	def initialize(input_language)
+		super(input_language)
+		@item_type = "string-array"
+		@docs = ["strings.xml", "arrays.xml", "cm_strings.xml", "cm_arrays.xml"]
+	end
+
+	def prepare_english_docs
+		super(@docs)
+	end
+
+	def prepare_to_be_translated_lang_docs
+		super(@docs)
+	end
+
+	def find_items_exist_in_to_be_translated_lang
+		super(prepare_to_be_translated_lang_docs, @item_type)
+	end
+
+	def find_missing_items
+		super(prepare_english_docs, find_items_exist_in_to_be_translated_lang, @item_type)
+	end
+
+	def write_found_items_to_excel_file
+		different_items = find_missing_items
+		p = Axlsx::Package.new
+		wb = p.workbook #Create excel sheet
+		wb.add_worksheet(:name => "Basic Worksheet") do |sheet|
+	   		sheet.add_row ["Id", "English", "#{@input_language.upcase}"]
+	   			different_items.each do |key,value| #Write all key,value pairs one by one A column -> String, B column -> Value
+	        		#print "Key is = #{key} , value is = #{value}"
+							#puts "id is = #{key} values is = #{value}"
+							id = key
+							englishVal = value
+	   					sheet.add_row [id, englishVal]
+	   		end
+		end
+		p.serialize("EnglishTo#{@input_language}translation#{@item_type}s.xls") #Have to save as xls , otherwise spreadsheet gem cannot read it correctly
+		puts "EnglishTo#{@input_language}translation#{@item_type}s.xls created"
+	end
+
+	def import_found_items_from_excel_file
+		puts "Transfer Array Translations started with input_language = #{@input_language} and item_type = #{@item_type}"
+		Spreadsheet.client_encoding = 'UTF-8'
+		begin
+			#puts "EnglishTo#{input_language}translation#{item_type}s.xls"
+			book = Spreadsheet.open("EnglishTo#{@input_language}translation#{@item_type}s.xls")
+			file_name = "values-#{@input_language}/arrays.xml"
+			#puts "book created"
+			xml_file = File.read("values-#{@input_language}/arrays.xml")
+			#puts "xml_file ok"
+			doc = Nokogiri::XML(xml_file)
+		rescue
+			raise "File Not Found, Create file or give permissions"
+		end
+		sheet = book.worksheet 0
+		sheet.each 1 do |row|
+			unless row[2].nil?
+				string_array = Nokogiri::XML::Node.new "#{@item_type}", doc
+				#string_array.content = row[2]
+				string_array["name"] = row[0]
+				#child = Nokogiri::XML::Node.new "item" ,doc
+				child_items = row[2].split(",")
+				child_items.each do |child_item|
+					#print "Child is = #{child_item}"
+					child = Nokogiri::XML::Node.new "item" ,doc
+					child.content = child_item
+					string_array.add_child(child)
+				end
+				doc.root.add_child string_array
+			end
+		end
+		File.write(file_name, doc.to_xml)
+	end
+
 end
 
 
 
 class TranslatorFactory
-	def get_translator(input_language, item_type)
+	def self.get_translator(input_language, item_type)
 		case item_type
-		when "string" then StringTranslator(input_language)
-		when "string-array" then StringArrayTranslator(input_language)
+		when "string" then StringTranslator.new(input_language)
+		when "string-array" then StringArrayTranslator.new(input_language)
 		end
 	end
 end
 
+class TranslatorUtils
+
+	def self.is_item_suitable_to_add_missing_list(node, found_items, missing_item_pairs)
+		 return ("false" != node["translatable"].to_s &&
+							"tablet" != node["product"] &&
+							!found_items.include?(node["name"]) &&
+							!missing_item_pairs.include?(node["name"]) &&
+							!node.text.start_with?('@'))
+	end
+
+	def self.is_item_suitable_to_add_founded_list(node)
+		return ("false" != node["translatable"].to_s &&
+					 "tablet" != node["product"] &&
+					 !node.text.start_with?("@"))
+	end
+
+end
+
+=begin
 def finder_controller(item_type, input_language)
 		if item_type == "string"
 			english_docs = prepare_single_item_en_docs
@@ -167,8 +300,10 @@ def finder_controller(item_type, input_language)
 			write_found_arrays_to_excel_file(input_language, arrays_exists_only_in_english, item_type)
 		end
 end
-
+=end
+##################### LEGACY CODE PART #############################
 ##### START SINGLE ITEMS --> String Integer  <----  ################
+=begin
 def prepare_single_item_en_docs
 	file_names = ["values/strings.xml", "values/cm_strings.xml", "values/qtistrings.xml"]
 	files = []
@@ -431,5 +566,16 @@ elsif(ARGV.first == "all")
 	#find_not_translated_strings(ARGV[1],"string-array")
 elsif(ARGV.first == "help")
 	puts "diff -> to find differences between two files , take two params language and element  ex StringParser.rb diff tr string"
+	puts "transfer to import translations from excel file ex StringParser.rb transfer tr string"
+end
+=end
+##### OOP MAIN ####
+translator = TranslatorFactory.get_translator(ARGV[1], ARGV[2])
+if(ARGV.first == "diff")
+	translator.translate
+elsif(ARGV.first == "transfer")
+	translator.transfer
+elsif(ARGV.first == "help")
+	puts "diff -> to find differences between two files , take two params language and element  ex StringParser diff tr string"
 	puts "transfer to import translations from excel file ex StringParser.rb transfer tr string"
 end
