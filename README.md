@@ -1,6 +1,8 @@
 # AOSPTranslator
 Ruby script to make translations between languages easier especially for AOSP projects<br />
-It has two different modes : First finding differences , or find missing translations for a selected language<br />
+It has two different modes :
+First finding differences/items that needs translation for a selected language<br />
+
 
 
 In Finding Differences mode:<br />
@@ -18,6 +20,8 @@ Example : StringParser.rb diff tr string<br />
 
 Currently supported element types<br />
 string, string-array<br />
+
+Second mode is Add Translations according to element name and id
 
 In Transfer Translations mode:<br />
 In this mode Script will read translated values, and automatically puts them into related files.<br />
