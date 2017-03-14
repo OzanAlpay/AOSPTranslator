@@ -298,9 +298,13 @@ class PluralsTranslator < Translator
 				if TranslatorUtils.is_item_suitable_to_add_missing_list(node, founded_items, missing_item_pairs)
 					#puts "Node Full =  #{node.to_s}"
 					#puts "Node class type is = #{node.class.name}"
-					puts "Node class children is = #{node.children.children}"
+					#puts "Node class children is = #{node.children}"
+					#node.children.each() do | child |
+						#puts "Child is =  #{child}"
+						#missing_item_pairs[node["name"]] = child.to_s unless child.to_s.empty?
+					#end
 					#puts "Node only text = #{node.text}"
-					missing_item_pairs[node["name"]] = node.text
+					missing_item_pairs[node["name"]] = node.children
 				end
 			end
 		end
@@ -309,7 +313,21 @@ class PluralsTranslator < Translator
 
 	def write_found_items_to_excel_file
 		different_items = find_missing_items(prepare_english_docs, find_items_exist_in_to_be_translated_lang, @item_type)
-		#puts "PluralsTranslator different items are = #{different_items}"
+		puts "Different items are = #{different_items}"
+		p = Axlsx::Package.new
+		wb = p.workbook #Create excel sheet
+		wb.add_worksheet(:name => "Basic Worksheet") do |sheet|
+	   		sheet.add_row ["Id", "English", "#{@input_language.upcase}"]
+	   			different_items.each do |key,value| #Write all key,value pairs one by one A column -> String, B column -> Value
+	        		#print "Key is = #{key} , value is = #{value}"
+							#puts "id is = #{key} values is = #{value}"
+							id = key
+							englishVal = value
+	   					sheet.add_row [id, englishVal]
+	   		end
+		end
+		p.serialize("EnglishTo#{@input_language}translation#{@item_type}s.xls") #Have to save as xls , otherwise spreadsheet gem cannot read it correctly
+		puts "EnglishTo#{@input_language}translation#{@item_type}s.xls created"
 	end
 
 	def import_translations_from_excel_file
