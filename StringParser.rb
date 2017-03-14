@@ -62,15 +62,24 @@ class Translator ## A base class for different translators
 	end
 
 	def find_missing_items(eng_docs, founded_items ,item_type) # Iterate over english document to get full list , and then look for founded ones to find missing items
+		raise NotImplementedError
+=begin
 		missing_item_pairs = {}
 		eng_docs.each() do |doc|
 			doc.xpath("//#{item_type}").each do |node|
 				if TranslatorUtils.is_item_suitable_to_add_missing_list(node, founded_items, missing_item_pairs)
-					missing_item_pairs[node["name"]] = node.text
+					if node.child != nil
+						missing_item_pairs[node["name"]] = node.children
+					elsif
+						missing_item_pairs[node["name"]] = node.text
+					end
+					#missing_item_pairs[node["name"]] = node.children if node.children != nil
+					#missing_item_pairs[node["name"]] = node.text
 				end
 			end
 		end
 		missing_item_pairs
+=end
 	end
 
 	def write_found_items_to_excel_file #Implement in subclass
@@ -95,7 +104,7 @@ class StringTranslator < Translator
 	def initialize(input_language)
 		super(input_language)
 		@item_type = "string"
-		@docs = ["strings.xml", "cm_strings.xml", "qtistrings.xml"]
+		@docs = ["strings.xml", "cm_strings.xml", "qtistrings.xml", "rcs_strings.xml"]
 	end
 
 	def prepare_english_docs ##Return available English Files Array
@@ -110,12 +119,26 @@ class StringTranslator < Translator
 		super(prepare_to_be_translated_lang_docs, @item_type)
 	end
 
-	def find_missing_items
-		super(prepare_english_docs, find_items_exist_in_to_be_translated_lang ,@item_type)
+	def find_missing_items(eng_docs, founded_items ,item_type) # Iterate over english document to get full list , and then look for founded ones to find missing items
+		missing_item_pairs = {}
+		eng_docs.each() do |doc|
+			doc.xpath("//#{item_type}").each do |node|
+				if TranslatorUtils.is_item_suitable_to_add_missing_list(node, founded_items, missing_item_pairs)
+					if node.child != nil
+						missing_item_pairs[node["name"]] = node.children
+					elsif
+						missing_item_pairs[node["name"]] = node.text
+					end
+					#missing_item_pairs[node["name"]] = node.children if node.children != nil
+					#missing_item_pairs[node["name"]] = node.text
+				end
+			end
+		end
+		missing_item_pairs
 	end
 
 	def write_found_items_to_excel_file
-		different_items = find_missing_items
+		different_items = find_missing_items(prepare_english_docs, find_items_exist_in_to_be_translated_lang, @item_type)
 		p = Axlsx::Package.new
 		wb = p.workbook #Create excel sheet
 		wb.add_worksheet(:name => "Basic Worksheet") do |sheet|
@@ -181,12 +204,20 @@ class StringArrayTranslator < Translator
 		super(prepare_to_be_translated_lang_docs, @item_type)
 	end
 
-	def find_missing_items
-		super(prepare_english_docs, find_items_exist_in_to_be_translated_lang, @item_type)
+	def find_missing_items(eng_docs, founded_items ,item_type) # Iterate over english document to get full list , and then look for founded ones to find missing items
+		missing_item_pairs = {}
+		eng_docs.each() do |doc|
+			doc.xpath("//#{item_type}").each do |node|
+				if TranslatorUtils.is_item_suitable_to_add_missing_list(node, founded_items, missing_item_pairs)
+					missing_item_pairs[node["name"]] = node.text
+				end
+			end
+		end
+		missing_item_pairs
 	end
 
 	def write_found_items_to_excel_file
-		different_items = find_missing_items
+		different_items = find_missing_items(prepare_english_docs, find_items_exist_in_to_be_translated_lang, @item_type)
 		p = Axlsx::Package.new
 		wb = p.workbook #Create excel sheet
 		wb.add_worksheet(:name => "Basic Worksheet") do |sheet|
@@ -239,6 +270,54 @@ class StringArrayTranslator < Translator
 
 end
 
+class PluralsTranslator < Translator
+	attr_reader :item_type, :docs_names, :docs
+
+	def initialize(input_language)
+		super(input_language)
+		@item_type = "plurals"
+		@docs = ["strings.xml", "plurals.xml", "cm_strings.xml", "cm_plurals.xml"]
+	end
+
+	def prepare_english_docs
+		super(@docs)
+	end
+
+	def prepare_to_be_translated_lang_docs
+		super(@docs)
+	end
+
+	def find_items_exist_in_to_be_translated_lang
+		super(prepare_to_be_translated_lang_docs, @item_type)
+	end
+
+	def find_missing_items(eng_docs, founded_items ,item_type)
+		missing_item_pairs = {}
+		eng_docs.each() do |doc|
+			doc.xpath("//#{item_type}").each do |node|
+				if TranslatorUtils.is_item_suitable_to_add_missing_list(node, founded_items, missing_item_pairs)
+					#puts "Node Full =  #{node.to_s}"
+					#puts "Node class type is = #{node.class.name}"
+					puts "Node class children is = #{node.children.children}"
+					#puts "Node only text = #{node.text}"
+					missing_item_pairs[node["name"]] = node.text
+				end
+			end
+		end
+		missing_item_pairs
+	end
+
+	def write_found_items_to_excel_file
+		different_items = find_missing_items(prepare_english_docs, find_items_exist_in_to_be_translated_lang, @item_type)
+		#puts "PluralsTranslator different items are = #{different_items}"
+	end
+
+	def import_translations_from_excel_file
+	end
+
+
+end
+
 
 
 class TranslatorFactory
@@ -246,6 +325,7 @@ class TranslatorFactory
 		case item_type
 		when "string" then StringTranslator.new(input_language)
 		when "string-array" then StringArrayTranslator.new(input_language)
+		when "plurals" then PluralsTranslator.new(input_language)
 		end
 	end
 end
@@ -257,7 +337,7 @@ class TranslatorUtils
 							"tablet" != node["product"] &&
 							!found_items.include?(node["name"]) &&
 							!missing_item_pairs.include?(node["name"]) &&
-							!node.text.start_with?('@'))
+							!node.text.strip.start_with?('@'))
 	end
 
 	def self.is_item_suitable_to_add_founded_list(node)
