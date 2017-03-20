@@ -171,14 +171,17 @@ class StringTranslator < Translator
 		sheet1 = book.worksheet 0
 		sheet1.each 1 do |row|
 			if row[2] != nil
+				#puts ""
 				string_node = Nokogiri::XML::Node.new "#{@item_type}", doc
-				puts string_node
-				string_node.content = row[2]
+				#string_node.content = row[2]
 				string_node["name"] = row[0]
-				#puts "Ozan string_node = #{string_node.to_s}"
+				#string_node.content = string_node.text
+				string_node.inner_html = row[2]
+				#puts "String_node = #{string_node}"
 				doc.root.add_child string_node
 			end
 		end
+		puts "Completed"
 		File.write(file_name, doc.to_xml)
 	end
 
