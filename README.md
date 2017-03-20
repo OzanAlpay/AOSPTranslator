@@ -36,7 +36,8 @@ Microsoft Excel 97/2000/XP/2000 format and try again.<br />
 It will read through excel file and create elements automatically.<br />
 
 TODO<br />
-FATAL : xliffg problem -> FIXED ON 20.03.2017
+FATAL : xliffg problem -> FIXED ON 20.03.2017<br>
+FATAL : We need support for plurals <br>
 Add more supported element types<br />
 Support different file extensions<br />
 Bugfixing.<br />
